@@ -1,10 +1,20 @@
 # grasp
 
-Android-Flutter-App zum Lernen von **Zusammenhängen** statt Fakten. Der Nutzer
-fügt einen Text ein (Artikel, Chatverlauf, Notizen), die App zieht daraus
-Zusammenhangs-Fragen. Im Loop erklärt der Nutzer eine Frage frei per Sprache,
-die App bestätigt, was saß, und ergänzt **genau einen** fehlenden Faden. Danach
-schätzt der Nutzer sich selbst ein; das steuert die Wiedervorlage.
+Android-Flutter-App zum Lernen von **Zusammenhängen** statt Fakten. Im Loop
+erklärt der Nutzer eine Frage frei per Sprache, die App bestätigt, was saß, und
+ergänzt **genau einen** fehlenden Faden. Danach schätzt der Nutzer sich selbst
+ein; das steuert die Wiedervorlage.
+
+Den Stoff dafür gibt es auf zwei Wegen:
+
+- **Generiert** (der Normalfall): Kategorie wählen → die App schlägt konkrete
+  Themen vor → sie schreibt ein belegtes Briefing dazu → das wird der Corpus.
+- **Eigenes Material**: Text einfügen (Artikel, Chatverlauf, Notizen).
+
+Vor jedem generierten Thema wählt der Nutzer, wie er ran will: **erst lesen**
+(Rekonstruktion) oder **blind raten** (Productive Failure, Spec 4.3). Blind gilt
+nur für den ersten Durchgang – danach ist der Stoff berührt und es wird normal
+rekonstruiert.
 
 - Package / applicationId: `com.catchingcomets.grasp`
 - Kein Backend. Alles lokal in `shared_preferences`, LLM- und STT-Calls gehen
@@ -37,9 +47,10 @@ verwässert, baut eine andere App:
 
 1. **Ergänzen statt benoten.** Keine Note, kein Prozentwert, kein Lob-Vokabular
    („richtig", „sehr gut"). Die App sagt, *was* sie gehört hat, nie *wie gut*.
-2. **Nur Rekonstruktion.** Fragen und Fäden kommen ausschließlich aus dem
-   Corpus des Nutzers – deshalb kann nichts halluziniert werden. Expansions-
-   Fragen (über den Corpus hinaus) sind bewusst noch nicht drin.
+2. **Gefragt wird nur, was im Corpus steht.** Auch bei generierten Themen:
+   erst schreibt die App das Briefing, dann werden die Fragen daraus gezogen.
+   Nie wird abgefragt, was der Nutzer nie gesehen hat. Deshalb ist auch das
+   Briefing per Google-Search-Grounding belegt und zeigt seine Quellen.
 3. **Fluchtweg ohne Schuld.** „Weiß nicht – sag's mir" ist im Loop immer einen
    Tap entfernt und wird nie kommentiert.
 
@@ -52,10 +63,20 @@ verwässert, baut eine andere App:
   SM-2. `nochmal` → Intervall 0 (kommt in derselben Session wieder),
   `wackelig` → ×1.2, `saß gut` → ×ease. Ease 1.3–2.8, Intervall max. 365 Tage.
   Reine Funktionen, in `test/scheduler_test.dart` abgedeckt.
-- **`lib/services/gemini_service.dart`** — direkte REST-Calls gegen
-  `gemini-2.5-flash` (kein SDK: `google_generative_ai` ist deprecated).
-  `extract()` nutzt `responseSchema` für strukturierte Ausgabe;
-  `feedback()` streamt via `streamGenerateContent?alt=sse`. Der Antworttext ist
+- **`lib/services/gemini_client.dart`** — der Transport: `post`,
+  `postStructured` (mit `responseSchema`), `stream` (SSE), Fehlermeldungen,
+  Key-Prüfung. Ein Client für alle Aufrufe, in `main()` erzeugt und an beide
+  Services gereicht. Kein SDK: `google_generative_ai` ist deprecated.
+- **`lib/services/discovery_service.dart`** — `suggestTopics()` (8 Vorschläge
+  je Kategorie), `writeBriefing()` (gestreamt, mit
+  `"tools":[{"google_search":{}}]`; Quellen kommen aus
+  `groundingMetadata.groundingChunks`), `suggestFollowUps()` (3 Anschlüsse am
+  Sessionende).
+- **`lib/services/gemini_service.dart`** — `extract()` zieht Zusammenhänge aus
+  einem Corpus (inkl. `anchor` je Frage für den Blind-Modus);
+  `feedback(mode:)` streamt die Rückmeldung in zwei Tonlagen
+  (`reconstruct` = bestätigen und ergänzen, `guess` = Versuch spiegeln und
+  auflösen). Der Antworttext ist
   in `[[CONFIRMED]]` / `[[GAP]]` geteilt und wird von `parseFeedback()` auch
   halb angekommen sauber zerlegt (Test: `test/feedback_parser_test.dart`).
 - **`lib/services/stt_service.dart` / `deepgram_stt_service.dart`** —
@@ -69,13 +90,19 @@ verwässert, baut eine andere App:
 - **`lib/providers/session_provider.dart`** — der Loop-Zustand:
   `asking → recording → responding → rating`, Warteschlange der fälligen
   Zusammenhänge, `reveal()` für den Fluchtweg.
-- **`lib/screens/`** — `home_screen` (Themen + Fälligkeiten),
+- **`lib/screens/`** — `home_screen` (Einstiegskarte + Bibliothek mit
+  Fälligkeiten), `discover_screen` (Kategorien aus `lib/models/category.dart`,
+  Freitextfeld, Vorschlagsliste), `briefing_screen` (Briefing schreiben,
+  extrahieren, Thema anlegen, in die Session springen),
   `add_topic_screen` (Paste-Feld → Extraktion → Vorschau zum Aussortieren),
-  `session_screen` (der Loop).
+  `session_screen` (der Loop, inkl. Blind-Zweig und Anschluss-Themen).
+  Die Wahl lesen/blind fragt `lib/widgets/mode_sheet.dart` ab – **vor** dem
+  Briefing, sonst hätte man beim Blind-Modus schon gelesen.
 - **`lib/theme/app_theme.dart`** — alle Farben und Textstile. Keine
   Inline-Farben in Widgets.
 
 ## Bewusst (noch) nicht drin
 
-Expansions-Fragen, themenübergreifende Vernetzung, Audio als Corpus, Sync,
-iOS/Web. Der `SttService`-Schnitt und die zentralen Prompts halten das offen.
+Themenübergreifende Vernetzung („das erinnert an letzte Woche"), Audio als
+Corpus, Sync, iOS/Web. Der `SttService`-Schnitt und die zentralen Prompts
+halten das offen.

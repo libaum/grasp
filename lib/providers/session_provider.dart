@@ -35,6 +35,7 @@ class SessionProvider extends ChangeNotifier {
     required SttService stt,
     required GeminiService gemini,
   })  : _topicId = topic.id,
+        _blind = topic.blind,
         // ignore: prefer_initializing_formals
         _library = library,
         // ignore: prefer_initializing_formals
@@ -61,6 +62,9 @@ class SessionProvider extends ChangeNotifier {
   }
 
   final String _topicId;
+
+  /// Das Briefing wurde nicht gelesen – beim ersten Durchgang wird geraten.
+  final bool _blind;
   final LibraryProvider _library;
   final SttService _stt;
   final GeminiService _gemini;
@@ -95,6 +99,11 @@ class SessionProvider extends ChangeNotifier {
   int get answered => _answered;
 
   String get topicId => _topicId;
+
+  /// Rate-Modus: nur beim allerersten Durchgang eines Zusammenhangs, und nur,
+  /// wenn der Nutzer das Material bewusst nicht gelesen hat. Danach ist der
+  /// Stoff berührt und es wird normal rekonstruiert.
+  bool get isGuessing => _blind && (currentThread?.history.isEmpty ?? false);
 
   Future<void> startRecording() async {
     if (_phase != SessionPhase.asking) return;
@@ -145,6 +154,7 @@ class SessionProvider extends ChangeNotifier {
           keyPoints: thread.keyPoints,
           contested: thread.contested,
           transcript: _transcript,
+          mode: isGuessing ? FeedbackMode.guess : FeedbackMode.reconstruct,
         )
         .listen(
           (partial) {

@@ -5,6 +5,7 @@ import '../models/topic.dart';
 import '../providers/library_provider.dart';
 import '../theme/app_theme.dart';
 import 'add_topic_screen.dart';
+import 'discover_screen.dart';
 import 'session_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -26,14 +27,67 @@ class HomeScreen extends StatelessWidget {
         ),
         child: const Icon(Icons.add_rounded),
       ),
-      body: library.isEmpty
-          ? const _EmptyState()
-          : ListView.separated(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 96),
-              itemCount: library.topics.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 12),
-              itemBuilder: (context, i) => _TopicTile(topic: library.topics[i]),
-            ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 96),
+        children: [
+          const _DiscoverCard(),
+          const SizedBox(height: 24),
+          if (library.isEmpty)
+            const _EmptyState()
+          else ...[
+            Text('DEINE THEMEN', style: AppTheme.label),
+            const SizedBox(height: 12),
+            for (final topic in library.topics) ...[
+              _TopicTile(topic: topic),
+              const SizedBox(height: 12),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Der Weg für Leute ohne eigenes Material – und der Normalfall.
+class _DiscoverCard extends StatelessWidget {
+  const _DiscoverCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppTheme.thread.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const DiscoverScreen()),
+        ),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(22, 24, 22, 24),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppTheme.thread.withValues(alpha: 0.35)),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Was lernen wir heute?',
+                        style: AppTheme.title.copyWith(color: AppTheme.thread)),
+                    const SizedBox(height: 6),
+                    Text('Such dir was aus – den Stoff schreib ich dir.',
+                        style: AppTheme.caption),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_rounded,
+                  color: AppTheme.thread, size: 20),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -43,26 +97,23 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'Noch nichts hier.',
-              style: AppTheme.question.copyWith(fontSize: 22),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 14),
-            Text(
-              'Füg einen Artikel, ein Gespräch oder deine Notizen ein. '
-              'Daraus werden Fragen, die du laut beantwortest.',
-              style: AppTheme.bodyMuted,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 30, 4, 0),
+      child: Column(
+        children: [
+          Text(
+            'Noch nichts gelernt.',
+            style: AppTheme.question.copyWith(fontSize: 20),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Fang oben an – oder füg mit + einen eigenen Artikel, ein Gespräch '
+            'oder deine Notizen ein.',
+            style: AppTheme.bodyMuted,
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }

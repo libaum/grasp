@@ -8,6 +8,7 @@ class Thread {
     required this.id,
     required this.question,
     required this.keyPoints,
+    this.anchor = '',
     this.contested = false,
     SrState? sr,
     List<Attempt>? history,
@@ -21,6 +22,10 @@ class Thread {
   /// Checkliste gezeigt, außer er nimmt den Fluchtweg.
   final List<String> keyPoints;
 
+  /// Ein bis zwei Sätze Kontext, mit denen man raten *kann*, ohne dass die
+  /// Antwort verraten ist. Nur im Blind-Modus sichtbar.
+  final String anchor;
+
   /// Deutungsoffenes Thema: die App ergänzt hier Perspektiven statt Wahrheiten.
   final bool contested;
 
@@ -31,6 +36,7 @@ class Thread {
         id: id,
         question: question,
         keyPoints: keyPoints,
+        anchor: anchor,
         contested: contested,
         sr: sr ?? this.sr,
         history: history ?? this.history,
@@ -40,6 +46,7 @@ class Thread {
         'id': id,
         'question': question,
         'keyPoints': keyPoints,
+        'anchor': anchor,
         'contested': contested,
         'sr': sr.toJson(),
         'history': history.map((a) => a.toJson()).toList(),
@@ -50,6 +57,7 @@ class Thread {
         question: json['question'] as String,
         keyPoints:
             (json['keyPoints'] as List<dynamic>).map((e) => e as String).toList(),
+        anchor: json['anchor'] as String? ?? '',
         contested: json['contested'] as bool? ?? false,
         sr: SrState.fromJson(json['sr'] as Map<String, dynamic>),
         history: (json['history'] as List<dynamic>? ?? [])

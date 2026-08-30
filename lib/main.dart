@@ -4,21 +4,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'providers/library_provider.dart';
 import 'screens/home_screen.dart';
+import 'services/discovery_service.dart';
+import 'services/gemini_client.dart';
 import 'services/gemini_service.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
+  // Ein HTTP-Client für alle Gemini-Aufrufe.
+  final gemini = GeminiClient();
 
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => LibraryProvider(prefs)),
-        Provider(
-          create: (_) => GeminiService(),
-          dispose: (_, GeminiService service) => service.dispose(),
-        ),
+        Provider(create: (_) => GeminiService(client: gemini)),
+        Provider(create: (_) => DiscoveryService(client: gemini)),
       ],
       child: const GraspApp(),
     ),

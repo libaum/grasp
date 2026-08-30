@@ -9,11 +9,13 @@ class FeedbackCard extends StatelessWidget {
     super.key,
     required this.confirmed,
     required this.gap,
+    this.confirmedLabel = 'DAS SASS',
     this.gapLabel = 'EIN FADEN FEHLTE NOCH',
   });
 
   final String confirmed;
   final String gap;
+  final String confirmedLabel;
   final String gapLabel;
 
   @override
@@ -22,7 +24,7 @@ class FeedbackCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (confirmed.isNotEmpty) ...[
-          Text('DAS SASS',
+          Text(confirmedLabel,
               style: AppTheme.label.copyWith(color: AppTheme.confirm)),
           const SizedBox(height: 10),
           Text(confirmed, style: AppTheme.body),
