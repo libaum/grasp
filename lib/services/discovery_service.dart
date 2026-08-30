@@ -7,6 +7,14 @@ class TopicSuggestion {
   const TopicSuggestion({required this.title, required this.teaser});
   final String title;
   final String teaser;
+
+  Map<String, dynamic> toJson() => {'title': title, 'teaser': teaser};
+
+  factory TopicSuggestion.fromJson(Map<String, dynamic> json) =>
+      TopicSuggestion(
+        title: json['title'] as String? ?? '',
+        teaser: json['teaser'] as String? ?? '',
+      );
 }
 
 /// Zwischenstand des einlaufenden Briefings.
@@ -19,7 +27,9 @@ class BriefingUpdate {
 /// Findet Themen und schreibt den Stoff dazu – damit man nicht erst selbst
 /// Material suchen muss, bevor man lernen kann.
 class DiscoveryService {
-  DiscoveryService({GeminiClient? client}) : _client = client ?? GeminiClient();
+  DiscoveryService({required GeminiClient client})
+      // ignore: prefer_initializing_formals
+      : _client = client;
 
   final GeminiClient _client;
 

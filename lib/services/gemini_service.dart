@@ -35,14 +35,13 @@ enum FeedbackMode {
 
 /// Extraktion von Zusammenhängen und Rückmeldung auf Erklärungen.
 class GeminiService {
-  GeminiService({GeminiClient? client, Uuid? uuid})
-      : _client = client ?? GeminiClient(),
+  GeminiService({required GeminiClient client, Uuid? uuid})
+      // ignore: prefer_initializing_formals
+      : _client = client,
         _uuid = uuid ?? const Uuid();
 
   final GeminiClient _client;
   final Uuid _uuid;
-
-  static bool get hasKey => GeminiClient.hasKey;
 
   /// Sehr lange Corpora werden gekappt – ein Artikel passt locker darunter.
   static const int maxCorpusChars = 60000;

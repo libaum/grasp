@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 
 import '../models/topic.dart';
 import '../providers/library_provider.dart';
+import '../services/api_keys.dart';
 import '../theme/app_theme.dart';
 import 'add_topic_screen.dart';
 import 'discover_screen.dart';
+import 'keys_screen.dart';
 import 'session_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -14,10 +16,21 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final library = context.watch<LibraryProvider>();
+    final keys = context.watch<ApiKeys>();
 
     return Scaffold(
       appBar: AppBar(
         title: Text('grasp', style: AppTheme.title),
+        actions: [
+          if (!keys.isBakedIn)
+            IconButton(
+              icon: const Icon(Icons.vpn_key_outlined, size: 20),
+              tooltip: 'Schlüssel',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const KeysScreen()),
+              ),
+            ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppTheme.thread,
@@ -30,6 +43,10 @@ class HomeScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 96),
         children: [
+          if (!keys.isComplete) ...[
+            const _MissingKeysCard(),
+            const SizedBox(height: 16),
+          ],
           const _DiscoverCard(),
           const SizedBox(height: 24),
           if (library.isEmpty)
@@ -43,6 +60,42 @@ class HomeScreen extends StatelessWidget {
             ],
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Ohne Schlüssel geht nichts – aber die App sagt das ruhig, statt erst beim
+/// ersten Fehlschlag.
+class _MissingKeysCard extends StatelessWidget {
+  const _MissingKeysCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppTheme.surface,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const KeysScreen()),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+          child: Row(
+            children: [
+              const Icon(Icons.vpn_key_outlined,
+                  size: 18, color: AppTheme.muted),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text('Erst noch die Schlüssel eintragen',
+                    style: AppTheme.body),
+              ),
+              const Icon(Icons.chevron_right_rounded,
+                  size: 20, color: AppTheme.faint),
+            ],
+          ),
+        ),
       ),
     );
   }

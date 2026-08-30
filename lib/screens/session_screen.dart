@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../models/thread.dart';
 import '../models/topic.dart';
+import '../services/api_keys.dart';
 import '../services/discovery_service.dart';
 import '../providers/library_provider.dart';
 import '../providers/session_provider.dart';
@@ -32,7 +33,7 @@ class SessionScreen extends StatelessWidget {
       create: (_) => SessionProvider(
         topic: topic,
         library: library,
-        stt: DeepgramSttService(),
+        stt: DeepgramSttService(apiKey: context.read<ApiKeys>().deepgram),
         gemini: context.read<GeminiService>(),
       ),
       child: _SessionView(topic: topic),

@@ -13,11 +13,12 @@ import 'stt_service.dart';
 /// Bewusst nicht Androids eigene Spracherkennung – die bricht nach wenigen
 /// Sekunden Stille ab, und beim freien Erklären denkt man nun mal nach.
 class DeepgramSttService implements SttService {
-  DeepgramSttService({AudioRecorder? recorder})
-      : _recorder = recorder ?? AudioRecorder();
+  DeepgramSttService({required String apiKey, AudioRecorder? recorder})
+      // ignore: prefer_initializing_formals
+      : _apiKey = apiKey,
+        _recorder = recorder ?? AudioRecorder();
 
-  static const String apiKey = String.fromEnvironment('DEEPGRAM_API_KEY');
-  static bool get hasKey => apiKey.isNotEmpty;
+  final String _apiKey;
 
   static const int _sampleRate = 16000;
 
@@ -50,9 +51,9 @@ class DeepgramSttService implements SttService {
   @override
   Future<void> start() async {
     if (_isRecording) return;
-    if (!hasKey) {
-      throw SttException('Kein Deepgram-Key konfiguriert. Starte die App mit '
-          '--dart-define-from-file=dart_defines.json.');
+    if (_apiKey.isEmpty) {
+      throw SttException(
+          'Kein Deepgram-Schlüssel hinterlegt. Trag ihn unter Schlüssel ein.');
     }
     if (!await _recorder.hasPermission()) {
       throw SttException('Ohne Mikrofon-Erlaubnis kann ich nicht zuhören.');
@@ -70,7 +71,7 @@ class DeepgramSttService implements SttService {
       ),
     );
 
-    final listener = Deepgram(apiKey).listen.liveListener(
+    final listener = Deepgram(_apiKey).listen.liveListener(
       audio,
       queryParams: const {
         'model': 'nova-3',

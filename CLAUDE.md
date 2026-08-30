@@ -34,11 +34,33 @@ flutter test
 Ohne `--dart-define-from-file` sind `GEMINI_API_KEY` und `DEEPGRAM_API_KEY`
 leer; die App zeigt dann eine Meldung statt zu transkribieren oder zu antworten.
 
+## Web
+
+```bash
+flutter run -d chrome        # bewusst OHNE dart-defines
+flutter build web --release
+```
+
+Der Loop läuft im Browser genauso: `record` liefert dort PCM16 über
+AudioWorklet, Deepgram authentifiziert sich über Websocket-Subprotokolle
+(`['token', key]`), und die Gemini-REST-API erlaubt Cross-Origin-Aufrufe mit
+`x-goog-api-key`. Mikrofon nur über HTTPS oder localhost.
+
+Jeder Push auf `main` baut und veröffentlicht über GitHub Pages
+(`.github/workflows/deploy-web.yml`, `--base-href /grasp/`).
+
 ## Secrets
 
-- `dart_defines.json` hält die echten Keys und ist **gitignored**. Nie
-  committen, nie in Quelltext oder Chat pasten.
-- `dart_defines.example.json` ist die committete Vorlage.
+- **Android**: `dart_defines.json` hält die echten Keys und ist **gitignored**.
+  Nie committen, nie in Quelltext oder Chat pasten.
+  `dart_defines.example.json` ist die committete Vorlage.
+- **Web**: dort wird **nie** ein Schlüssel eingebaut – er stünde im
+  ausgelieferten JavaScript und wäre öffentlich. Der Nutzer trägt ihn im
+  `keys_screen` ein, `lib/services/api_keys.dart` legt ihn in
+  `shared_preferences` (im Browser: localStorage) ab.
+- `ApiKeys` löst in dieser Reihenfolge auf: was per `--dart-define` im Build
+  steckt, sonst das Eingetragene. Deshalb sieht die Android-Version den
+  Schlüssel-Screen gar nicht erst (`isBakedIn`).
 
 ## Die drei Regeln, die das Produkt ausmachen
 
@@ -87,6 +109,12 @@ verwässert, baut eine andere App:
   bewusst nicht genommen: sie bricht bei Denkpausen ab.
 - **`lib/providers/library_provider.dart`** — alle Themen, JSON unter dem Key
   `grasp_topics_v1`.
+- **`lib/providers/suggestion_cache.dart`** — die Vorschläge je Kategorie
+  (`grasp_suggestions_v1`) plus die Titel früherer Runden
+  (`grasp_suggestions_seen_v1`, gedeckelt auf 24). Eine Kategorie zu öffnen
+  generiert **nichts** – erzeugt wird nur beim ersten Mal und auf
+  „Andere Vorschläge". Die Merkliste geht in `exclude`, damit Nachschlag auch
+  wirklich neu ist.
 - **`lib/providers/session_provider.dart`** — der Loop-Zustand:
   `asking → recording → responding → rating`, Warteschlange der fälligen
   Zusammenhänge, `reveal()` für den Fluchtweg.

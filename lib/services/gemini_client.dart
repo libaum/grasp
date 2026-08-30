@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'api_keys.dart';
+
 class GeminiException implements Exception {
   GeminiException(this.message);
   final String message;
@@ -13,19 +15,19 @@ class GeminiException implements Exception {
 /// gestreamt). Kein SDK – das offizielle Dart-Paket ist deprecated, und wir
 /// brauchen genau diese zwei Endpunkte.
 class GeminiClient {
-  GeminiClient({http.Client? client}) : _client = client ?? http.Client();
+  GeminiClient({required ApiKeys keys, http.Client? client})
+      // ignore: prefer_initializing_formals
+      : _keys = keys,
+        _client = client ?? http.Client();
 
+  final ApiKeys _keys;
   final http.Client _client;
 
   static const String model = 'gemini-2.5-flash';
   static const String _host = 'generativelanguage.googleapis.com';
-  static const String apiKey = String.fromEnvironment('GEMINI_API_KEY');
-
-  static bool get hasKey => apiKey.isNotEmpty;
-
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
+        'x-goog-api-key': _keys.gemini,
       };
 
   Uri _uri(String method, {bool sse = false}) => Uri.https(
@@ -35,9 +37,9 @@ class GeminiClient {
       );
 
   void requireKey() {
-    if (!hasKey) {
-      throw GeminiException('Kein Gemini-Key konfiguriert. Starte die App mit '
-          '--dart-define-from-file=dart_defines.json.');
+    if (!_keys.hasGemini) {
+      throw GeminiException('Kein Gemini-Schlüssel hinterlegt. Trag ihn unter '
+          'Schlüssel ein.');
     }
   }
 

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../models/category.dart';
 import '../providers/library_provider.dart';
+import '../providers/suggestion_cache.dart';
 import '../services/discovery_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/mode_sheet.dart';
@@ -31,28 +32,40 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     super.dispose();
   }
 
-  Future<void> _load(String category, {bool more = false}) async {
+  /// Kategorie öffnen: was schon erzeugt wurde, wird gezeigt – erst wenn zu
+  /// dieser Kategorie noch nichts da ist, wird generiert.
+  Future<void> _open(String category) async {
+    final cached = context.read<SuggestionCache>().forCategory(category);
     setState(() {
       _category = category;
+      _error = null;
+      _suggestions = cached ?? [];
+    });
+    if (cached == null || cached.isEmpty) await _generate(category);
+  }
+
+  /// Neue Vorschläge anfordern. Ersetzt die gemerkten – was schon mal dran war,
+  /// kommt über `exclude` nicht nochmal.
+  Future<void> _generate(String category) async {
+    setState(() {
       _loading = true;
       _error = null;
-      if (!more) _suggestions = [];
     });
 
-    // Was schon in der Bibliothek liegt (und was gerade vorgeschlagen wurde),
-    // soll nicht nochmal kommen.
+    final cache = context.read<SuggestionCache>();
     final exclude = [
       ...context.read<LibraryProvider>().topics.map((t) => t.title),
-      if (more) ..._suggestions.map((s) => s.title),
+      ...cache.seenTitles(category),
     ];
 
     try {
-      final suggestions =
-          await context.read<DiscoveryService>().suggestTopics(
-                category: category,
-                wish: _wishController.text,
-                exclude: exclude,
-              );
+      final suggestions = await context.read<DiscoveryService>().suggestTopics(
+            category: category,
+            wish: _wishController.text,
+            exclude: exclude,
+          );
+      if (!mounted) return;
+      await cache.put(category, suggestions);
       if (!mounted) return;
       setState(() {
         _suggestions = suggestions;
@@ -71,6 +84,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final blind = await askLearningMode(context, suggestion.title);
     if (blind == null || !mounted) return;
 
+    // Angefangenes liegt ab jetzt in der Bibliothek, nicht mehr im Vorschlag.
+    await context.read<SuggestionCache>().remove(_category!, suggestion.title);
+    if (!mounted) return;
+
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => BriefingScreen(title: suggestion.title, blind: blind),
@@ -79,25 +96,41 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     if (mounted) Navigator.of(context).pop();
   }
 
+  /// Von der Vorschlagsliste zurück zu den Kategorien – ein Schritt, nicht
+  /// gleich raus aus dem Screen.
+  void _backToCategories() {
+    setState(() {
+      _category = null;
+      _suggestions = [];
+      _error = null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_category ?? 'Was lernen wir heute?',
-            style: AppTheme.title.copyWith(fontSize: 17)),
-        leading: _category == null
-            ? null
-            : IconButton(
-                icon: const Icon(Icons.arrow_back_rounded),
-                onPressed: () => setState(() {
-                  _category = null;
-                  _suggestions = [];
-                  _error = null;
-                }),
-              ),
-      ),
-      body: SafeArea(
-        child: _category == null ? _buildCategories() : _buildSuggestions(),
+    final inSuggestions = _category != null;
+
+    return PopScope(
+      // Solange eine Kategorie offen ist, fängt der Screen das Zurück selbst
+      // ab, statt bis zur Themenliste durchzufallen.
+      canPop: !inSuggestions,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _backToCategories();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(_category ?? 'Was lernen wir heute?',
+              style: AppTheme.title.copyWith(fontSize: 17)),
+          leading: inSuggestions
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  onPressed: _backToCategories,
+                )
+              : null,
+        ),
+        body: SafeArea(
+          child: inSuggestions ? _buildSuggestions() : _buildCategories(),
+        ),
       ),
     );
   }
@@ -122,7 +155,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             for (final category in LearningCategory.all)
               _CategoryTile(
                 category: category,
-                onTap: () => _load(category.name),
+                onTap: () => _open(category.name),
               ),
           ],
         ),
@@ -138,7 +171,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                 cursorColor: AppTheme.thread,
                 textInputAction: TextInputAction.go,
                 onSubmitted: (value) {
-                  if (value.trim().isNotEmpty) _load(value.trim());
+                  if (value.trim().isNotEmpty) _open(value.trim());
                 },
                 decoration: InputDecoration(
                   hintText: 'Worauf hast du Lust?',
@@ -152,7 +185,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   color: AppTheme.thread),
               onPressed: () {
                 final wish = _wishController.text.trim();
-                if (wish.isNotEmpty) _load(wish);
+                if (wish.isNotEmpty) _open(wish);
               },
             ),
           ],
@@ -193,7 +226,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   style: AppTheme.caption
                       .copyWith(color: Theme.of(context).colorScheme.error)),
               TextButton(
-                onPressed: () => _load(_category!),
+                onPressed: () => _generate(_category!),
                 child: Text('Nochmal',
                     style: AppTheme.body.copyWith(color: AppTheme.thread)),
               ),
@@ -212,8 +245,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           return Padding(
             padding: const EdgeInsets.only(top: 8),
             child: TextButton(
-              onPressed:
-                  _loading ? null : () => _load(_category!, more: true),
+              onPressed: _loading ? null : () => _generate(_category!),
               child: Text(
                 _loading ? 'Moment …' : 'Andere Vorschläge',
                 style: AppTheme.body.copyWith(color: AppTheme.thread),
