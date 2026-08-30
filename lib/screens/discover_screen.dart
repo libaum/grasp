@@ -106,13 +106,18 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
       children: [
-        GridView.count(
-          crossAxisCount: 2,
+        GridView(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.05,
+          // Feste Höhe statt Seitenverhältnis, und sie wächst mit der
+          // Systemschriftgröße mit – sonst läuft die Kachel unten über.
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            mainAxisExtent:
+                150 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0),
+          ),
           children: [
             for (final category in LearningCategory.all)
               _CategoryTile(
@@ -246,18 +251,25 @@ class _CategoryTile extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(category.emoji, style: const TextStyle(fontSize: 24)),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(category.name,
-                      style: AppTheme.medium
-                          .copyWith(fontSize: 15, color: AppTheme.text)),
-                  const SizedBox(height: 5),
-                  Text(category.hint,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTheme.caption.copyWith(fontSize: 12)),
-                ],
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(category.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTheme.medium
+                            .copyWith(fontSize: 15, color: AppTheme.text)),
+                    const SizedBox(height: 5),
+                    Flexible(
+                      child: Text(category.hint,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTheme.caption.copyWith(fontSize: 12)),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
