@@ -94,7 +94,7 @@ class DiscoveryService {
       'generationConfig': {'temperature': 0.8},
     };
 
-    await for (final chunk in _client.stream(body)) {
+    await for (final chunk in _client.stream(body, chain: ModelChain.grounded)) {
       _collectSources(chunk, sources);
       final text = GeminiClient.textOf(chunk);
       if (text != null && text.isNotEmpty) buffer.write(text);

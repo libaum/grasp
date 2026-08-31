@@ -57,6 +57,9 @@ class GeminiService {
       systemInstruction: Prompts.extractionSystem,
       prompt: Prompts.extractionUser(trimmed),
       schema: _extractionSchema,
+      // Die Extraktion legt fest, was das Thema später fragt – hier lohnt
+      // sich das stärkere Modell.
+      chain: ModelChain.quality,
     );
 
     final threads = (parsed['threads'] as List<dynamic>? ?? [])
