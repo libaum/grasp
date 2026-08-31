@@ -45,6 +45,11 @@ class Topic {
   /// Gilt nur für den ersten Durchgang je Zusammenhang.
   final bool blind;
 
+  /// Ein Briefing wird gespeichert, sobald es geschrieben ist – die
+  /// Zusammenhänge kommen erst danach. Dazwischen kann der Nutzer die App
+  /// verlassen; dann liegt hier ein Thema ohne Fäden.
+  bool get hasThreads => threads.isNotEmpty;
+
   List<Thread> dueThreads({DateTime? today}) =>
       threads.where((t) => t.sr.isDue(today: today)).toList();
 

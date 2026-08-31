@@ -16,17 +16,32 @@ import 'session_screen.dart';
 /// Erzeugt den Stoff zu einem gewählten Thema. Im Lese-Modus läuft der Text
 /// sichtbar ein; im Blind-Modus bleibt er verborgen, sonst hätte man gelesen,
 /// was man erraten sollte.
+///
+/// Sobald der Text steht, liegt er als Thema in der Bibliothek – noch ohne
+/// Zusammenhänge. Wer zwischendrin rausgeht, findet das Thema wieder und
+/// kommt mit [BriefingScreen.resume] genau hierher zurück.
 class BriefingScreen extends StatefulWidget {
   const BriefingScreen({
     super.key,
     required this.title,
     required this.blind,
     this.parentTopicId,
-  });
+  }) : topicId = null;
+
+  /// Ein schon geschriebenes Briefing wieder aufnehmen: nichts neu
+  /// generieren, nur zeigen (bzw. im Blind-Modus direkt weiter).
+  BriefingScreen.resume(Topic topic, {super.key})
+      : title = topic.title,
+        blind = topic.blind,
+        parentTopicId = topic.parentTopicId,
+        topicId = topic.id;
 
   final String title;
   final bool blind;
   final String? parentTopicId;
+
+  /// Gesetzt, wenn das Thema schon in der Bibliothek liegt.
+  final String? topicId;
 
   @override
   State<BriefingScreen> createState() => _BriefingScreenState();
@@ -42,10 +57,38 @@ class _BriefingScreenState extends State<BriefingScreen> {
   bool _preparing = false;
   String? _error;
 
+  /// Die id des gespeicherten Themas – erst nach dem Schreiben gesetzt,
+  /// bei [BriefingScreen.resume] von Anfang an.
+  String? _topicId;
+
   @override
   void initState() {
     super.initState();
-    _write();
+    _topicId = widget.topicId;
+    if (_topicId == null) {
+      _write();
+    } else {
+      _restore();
+    }
+  }
+
+  /// Das gespeicherte Briefing zeigen, statt Kontingent für einen Text
+  /// auszugeben, den wir schon haben.
+  void _restore() {
+    final topic = context.read<LibraryProvider>().topicById(_topicId!);
+    if (topic == null) {
+      // Das Thema ist zwischendurch gelöscht worden – dann eben neu.
+      _topicId = null;
+      _write();
+      return;
+    }
+    _text = topic.corpus;
+    _sources = topic.sources;
+    _writing = false;
+    // Blind heißt: nicht lesen. Also gleich weiter in die Session.
+    if (widget.blind) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _startSession());
+    }
   }
 
   @override
@@ -77,17 +120,39 @@ class _BriefingScreenState extends State<BriefingScreen> {
           _writing = false;
         });
       },
-      onDone: () {
+      onDone: () async {
         if (!mounted) return;
         setState(() => _writing = false);
+        await _persist();
+        if (!mounted) return;
         // Blind heißt: nicht lesen. Also gleich weiter in die Session.
         if (widget.blind) _startSession();
       },
     );
   }
 
+  /// Der fertige Text kommt sofort in die Bibliothek – noch ohne
+  /// Zusammenhänge. Ein Briefing kostet Kontingent und Wartezeit; es darf
+  /// nicht verloren gehen, nur weil jemand die App zuklappt.
+  Future<void> _persist() async {
+    if (_topicId != null || _text.isEmpty) return;
+    final topic = Topic(
+      id: const Uuid().v4(),
+      title: widget.title,
+      corpus: _text,
+      createdAt: DateTime.now(),
+      threads: const [],
+      source: TopicSource.generated,
+      sources: _sources,
+      parentTopicId: widget.parentTopicId,
+      blind: widget.blind,
+    );
+    await context.read<LibraryProvider>().addTopic(topic);
+    _topicId = topic.id;
+  }
+
   /// Aus dem Briefing wird der Corpus – ab hier ist alles wie bei eingefügtem
-  /// Text: Zusammenhänge extrahieren, Thema anlegen, Loop starten.
+  /// Text: Zusammenhänge extrahieren, nachtragen, Loop starten.
   Future<void> _startSession() async {
     if (_preparing) return;
     setState(() {
@@ -95,26 +160,20 @@ class _BriefingScreenState extends State<BriefingScreen> {
       _error = null;
     });
 
+    final library = context.read<LibraryProvider>();
+    final gemini = context.read<GeminiService>();
+
     try {
-      final extraction = await context.read<GeminiService>().extract(_text);
+      await _persist();
+      final extraction = await gemini.extract(_text);
       if (!mounted) return;
 
-      final topic = Topic(
-        id: const Uuid().v4(),
-        title: widget.title,
-        corpus: _text,
-        createdAt: DateTime.now(),
-        threads: extraction.threads,
-        source: TopicSource.generated,
-        sources: _sources,
-        parentTopicId: widget.parentTopicId,
-        blind: widget.blind,
-      );
-      await context.read<LibraryProvider>().addTopic(topic);
+      final topicId = _topicId!;
+      await library.setThreads(topicId, extraction.threads);
       if (!mounted) return;
 
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => SessionScreen(topicId: topic.id)),
+        MaterialPageRoute(builder: (_) => SessionScreen(topicId: topicId)),
       );
     } on Object catch (e) {
       if (!mounted) return;

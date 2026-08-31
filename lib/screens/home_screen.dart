@@ -6,6 +6,7 @@ import '../providers/library_provider.dart';
 import '../services/api_keys.dart';
 import '../theme/app_theme.dart';
 import 'add_topic_screen.dart';
+import 'briefing_screen.dart';
 import 'discover_screen.dart';
 import 'keys_screen.dart';
 import 'session_screen.dart';
@@ -180,6 +181,9 @@ class _TopicTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final due = topic.dueCount();
+    // Ohne Fäden ist das Thema angefangen, aber nicht fertig: das Briefing
+    // steht, die Zusammenhänge fehlen noch.
+    final open = !topic.hasThreads;
 
     return Material(
       color: AppTheme.surface,
@@ -187,7 +191,11 @@ class _TopicTile extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => SessionScreen(topicId: topic.id)),
+          MaterialPageRoute(
+            builder: (_) => open
+                ? BriefingScreen.resume(topic)
+                : SessionScreen(topicId: topic.id),
+          ),
         ),
         onLongPress: () => _confirmDelete(context),
         child: Padding(
@@ -201,15 +209,20 @@ class _TopicTile extends StatelessWidget {
                     Text(topic.title, style: AppTheme.title),
                     const SizedBox(height: 6),
                     Text(
-                      due > 0
-                          ? '$due von ${topic.threads.length} dran'
-                          : '${topic.threads.length} Zusammenhänge · nichts fällig',
+                      switch ((open, due)) {
+                        (true, _) when topic.blind => 'Wartet auf dich – '
+                            'blind, ungelesen',
+                        (true, _) => 'Der Stoff liegt bereit – weiterlesen',
+                        (_, 0) => '${topic.threads.length} Zusammenhänge · '
+                            'nichts fällig',
+                        (_, final d) => '$d von ${topic.threads.length} dran',
+                      },
                       style: AppTheme.caption,
                     ),
                   ],
                 ),
               ),
-              if (due > 0)
+              if (due > 0 || open)
                 Container(
                   width: 10,
                   height: 10,

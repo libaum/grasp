@@ -60,6 +60,17 @@ class LibraryProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Trägt die Zusammenhänge zu einem schon gespeicherten Thema nach.
+  /// Das Briefing liegt in der Bibliothek, bevor extrahiert wird – sonst wäre
+  /// es weg, wenn der Nutzer zwischendrin rausgeht.
+  Future<void> setThreads(String topicId, List<Thread> threads) async {
+    final topic = topicById(topicId);
+    if (topic == null) return;
+    _replace(topic.copyWith(threads: threads));
+    await _save();
+    notifyListeners();
+  }
+
   Future<void> deleteTopic(String topicId) async {
     _topics = _topics.where((t) => t.id != topicId).toList();
     await _save();
