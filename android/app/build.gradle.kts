@@ -23,9 +23,16 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        manifestPlaceholders["appLabel"] = "grasp"
     }
 
     buildTypes {
+        debug {
+            // Eigene applicationId, damit Debug und Release nebeneinander laufen.
+            applicationIdSuffix = ".debug"
+            manifestPlaceholders["appLabel"] = "grasp DEBUG"
+        }
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
