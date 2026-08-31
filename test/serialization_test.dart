@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:grasp/models/attempt.dart';
 import 'package:grasp/models/rating.dart';
 import 'package:grasp/models/source_ref.dart';
+import 'package:grasp/models/sr_state.dart';
 import 'package:grasp/models/thread.dart';
 import 'package:grasp/models/topic.dart';
 
@@ -129,17 +130,40 @@ void main() {
 
   test('dueCount zählt nur fällige Zusammenhänge', () {
     final today = DateTime(2026, 8, 30);
+    Thread due(String id, DateTime dueDate) => Thread(
+          id: id,
+          question: '$id?',
+          keyPoints: const ['x'],
+          sr: SrState(
+            dueDate: dueDate,
+            intervalDays: 1,
+            ease: SrState.defaultEase,
+            reps: 1,
+          ),
+        );
+
     final topic = Topic(
       id: 't1',
       title: 'X',
       corpus: '',
       createdAt: today,
       threads: [
-        Thread(id: 'a', question: 'A?', keyPoints: const ['x']),
-        Thread(id: 'b', question: 'B?', keyPoints: const ['x'])
-            .copyWith(sr: null),
+        due('a', today.subtract(const Duration(days: 1))),
+        due('b', today),
+        due('c', today.add(const Duration(days: 1))),
       ],
     );
     expect(topic.dueCount(today: today), 2);
+  });
+
+  test('frische Zusammenhänge sind sofort fällig', () {
+    final topic = Topic(
+      id: 't1',
+      title: 'X',
+      corpus: '',
+      createdAt: DateTime.now(),
+      threads: [Thread(id: 'a', question: 'A?', keyPoints: const ['x'])],
+    );
+    expect(topic.dueCount(), 1);
   });
 }
